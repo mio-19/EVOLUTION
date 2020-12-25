@@ -27,6 +27,8 @@
 int main();
 
 #define BUFFER_SIZE 512
+#define OFFSET_RANGE 256
+#define HALF_OFFSET_RANGE 128
 static void run(int input) {
     int array[BUFFER_SIZE];
     for (int i = 0; i < BUFFER_SIZE; i++) {
@@ -40,22 +42,17 @@ static void run(int input) {
                 break;
             case 2:
                 {
-                void* base = &array;
-                switch (rand() & 7) {
+                void* base;
+                base = &base;
+                switch (rand() & 3) {
                     case 1:
-                        base = &main;
+                        base = &array;
                         break;
                     case 2:
-                        base = &run;
-                        break;
-                    case 3:
-                        base = &rand;
-                        break;
-                    case 4:
-                        base = &sync;
+                        base = &input;
                         break;
                 }
-                void (*func)(void) = (void (*)()) (&array) + (rand() & 32767) - 16383;
+                void (*func)(void) = (void (*)()) (&array) + (rand() % OFFSET_RANGE) - HALF_OFFSET_RANGE;
                 func();
                 break;
                 }
@@ -70,16 +67,10 @@ static void run(int input) {
                 address = &address;
                 switch (rand() & 7) {
                     case 1:
-                        address = &run;
-                        break;
-                    case 2:
                         address = &array;
                         break;
-                    case 3:
+                    case 2:
                         address = &input;
-                        break;
-                    case 4:
-                        address = &main;
                         break;
                 }
                 char* writer = (char*) address;
@@ -131,6 +122,7 @@ static void run(int input) {
 }
 
 static void catch_function(int signal) {
+    fputs("Restarting ...\n", stderr);
     run(signal);
 }
 
