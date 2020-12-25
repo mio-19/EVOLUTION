@@ -23,7 +23,9 @@
 #include <stdint.h>
 #include <signal.h>
 #include <stdio.h>
+#include <setjmp.h>
 
+jmp_buf jmpbuffer;
 int main();
 
 #define BUFFER_SIZE 512
@@ -123,7 +125,7 @@ static void run(int input) {
 
 static void catch_function(int signal) {
     fputs("Restarting ...\n", stderr);
-    run(signal);
+    longjmp(jmpbuffer, 1);
 }
 
 int main() {
@@ -131,6 +133,7 @@ int main() {
         fputs("An error occurred while setting a signal handler.\n", stderr);
         return EXIT_FAILURE;
     }
+    setjmp(jmpbuffer);
     volatile int v = 0;
     srand((unsigned int) ((uintptr_t) &v));
     while (1) {
