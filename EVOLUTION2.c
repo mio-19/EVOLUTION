@@ -23,62 +23,57 @@
 #include <stdint.h>
 #include <signal.h>
 #include <stdio.h>
-#include <setjmp.h>
+#include <stddef.h>
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-jmp_buf jmpbuffer;
 int main();
 
-#define BUFFER_SIZE 512
-#define OFFSET_RANGE 256
-#define HALF_OFFSET_RANGE 128
-static void run(int input) {
-    int array[BUFFER_SIZE];
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        array[i] = rand() + input;
+#define BUFFER_SIZE 65536
+static char memory[BUFFER_SIZE];
+
+static void catch_function(int signal) {
+    main();
+}
+
+int main() {
+    if (signal(SIGSEGV, catch_function) == SIG_ERR) {
+        fputs("An error occurred while setting a signal handler.\n", stderr);
+        return EXIT_FAILURE;
     }
+    if (signal(SIGILL, catch_function) == SIG_ERR) {
+        fputs("An error occurred while setting a signal handler.\n", stderr);
+        return EXIT_FAILURE;
+    }
+    volatile int v = 0;
+    srand((unsigned int) ((uintptr_t) &v));
     while (1) {
         continueLoop:
         switch (rand() & 32767) {
             case 1:
-                run(array[rand() % BUFFER_SIZE]);
-                break;
-            case 2:
                 {
-                void* base;
-                base = &base;
-                switch (rand() & 3) {
-                    case 1:
-                        base = &array;
-                        break;
-                    case 2:
-                        base = &input;
-                        break;
+                if (fork() == 0) {
+                    void (*func)(void) = (void*) &memory[rand() % BUFFER_SIZE];
+                    func();
                 }
-                void (*func)(void) = (void (*)()) (&array) + (rand() % OFFSET_RANGE) - HALF_OFFSET_RANGE;
-                func();
                 break;
                 }
+            case 2:
+                fork();
+                break;
             case 3:
-                sync();
                 break;
             case 4:
-                return;
-            case 5:
-                {
-                void* address;
-                address = &address;
-                switch (rand() & 7) {
-                    case 1:
-                        address = &array;
-                        break;
-                    case 2:
-                        address = &input;
-                        break;
-                }
-                char* writer = (char*) address;
-                *writer = (char) rand();
+                srand(rand() + (unsigned int) memory[rand() % BUFFER_SIZE]);
                 break;
+            case 5: ;
+                size_t s1 = rand() % BUFFER_SIZE;
+                size_t s2 = rand() % BUFFER_SIZE;
+                size_t n = rand() % (BUFFER_SIZE - MAX(s1, s2));
+                if (n != 0) {
+                    memcpy(&memory[s1], &memory[s2], n);
                 }
+                break;
             case 6:
                 {
                 DIR* dirFile = opendir( "." );
@@ -103,7 +98,7 @@ static void run(int input) {
                             case 1:
                                 {
                                 FILE *fileptr = fopen(hFile->d_name, "rb");
-                                fread(array, BUFFER_SIZE, 1, fileptr);
+                                fread(memory, rand() % BUFFER_SIZE, 1, fileptr);
                                 fclose(fileptr);
                                 break;
                                 }
@@ -113,35 +108,8 @@ static void run(int input) {
                 closedir(dirFile);
                 break;
                 }
-            case 7:
-                fork();
-                break;
-            case 8:
-                array[rand() % BUFFER_SIZE] = rand();
-                break;
         }
     }
-}
-
-static void catch_function(int signal) {
-    fputs("Restarting ...\n", stderr);
-    longjmp(jmpbuffer, 1);
-}
-
-int main() {
-    if (signal(SIGSEGV, catch_function) == SIG_ERR) {
-        fputs("An error occurred while setting a signal handler.\n", stderr);
-        return EXIT_FAILURE;
-    }
-    if (signal(SIGILL, catch_function) == SIG_ERR) {
-        fputs("An error occurred while setting a signal handler.\n", stderr);
-        return EXIT_FAILURE;
-    }
-    setjmp(jmpbuffer);
-    volatile int v = 0;
-    srand((unsigned int) ((uintptr_t) &v));
-    while (1) {
-        run(rand());
-    }
+    return 0;
 }
 
